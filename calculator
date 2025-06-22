@@ -1,0 +1,1043 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tiny Rental Calculator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    <style>
+        /* Custom styles for Inter font */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #ffffff; /* Changed background-color to white for the calculator's background */
+            overflow-x: hidden; /* Prevent horizontal scrolling on mobile */
+        }
+        /* Styles for message box */
+        .message-box {
+            position: absolute; /* Changed from fixed to absolute */
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: #4CAF50; /* Green by default for success/info */
+            color: white;
+            padding: 15px 25px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            z-index: 1000;
+            opacity: 1;
+            transition: opacity 0.5s ease-in-out;
+            font-size: 0.875rem; /* text-sm */
+            width: 90%; /* Adjust width to fit within container */
+            max-width: 300px; /* Max width for better readability */
+            text-align: center;
+        }
+        .message-box.hidden {
+            opacity: 0;
+            pointer-events: none; /* Allows clicks through when hidden */
+        }
+        .message-box.error {
+            background-color: #f44336; /* Red for errors */
+        }
+
+        /* Flatpickr custom styling to match Tailwind inputs and fix selection */
+        .flatpickr-input {
+            appearance: none; /* Remove default browser styling */
+            -webkit-appearance: none;
+            -moz-appearance: none;
+        }
+        .flatpickr-calendar {
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            border-radius: 0.5rem; /* rounded-lg */
+            /* Ensure the calendar itself doesn't have a background that creates lines */
+            background-color: white !important;
+        }
+
+        /* Ensure table elements within Flatpickr have no spacing or borders */
+        .flatpickr-days,
+        .flatpickr-weeks {
+            border-collapse: collapse !important;
+            border-spacing: 0 !important;
+        }
+
+        /* Base style for all selectable days (including prev/next month days that are selectable) */
+        .flatpickr-day {
+            color: #374151 !important; /* Default text color for selectable days */
+            background: white !important; /* Explicitly set background to white */
+            border: none !important; /* REMOVED ALL BORDERS */
+            text-decoration: none !important;
+            opacity: 1 !important;
+        }
+
+        /* Style for hover state on any selectable day */
+        .flatpickr-day:hover {
+            background: rgba(255, 128, 108, 0.4) !important; /* Slightly darker hover for selectable days */
+            border: none !important; /* REMOVED ALL BORDERS */
+            color: #374151 !important;
+        }
+
+        /* Style for days in range (between start and end) */
+        .flatpickr-day.inRange {
+            background: rgba(255, 128, 108, 0.2) !important; /* Lighter shade for in-range */
+            border: none !important; /* REMOVED ALL BORDERS */
+            color: #374151 !important; /* Darker text for readability */
+        }
+
+        /* Style for selected start/end dates (main color) */
+        .flatpickr-day.selected,
+        .flatpickr-day.startRange,
+        .flatpickr-day.endRange {
+            background: #ff806c !important; /* Your custom color */
+            border: none !important; /* REMOVED ALL BORDERS */
+            color: white !important;
+        }
+
+        /* Ensure hover on selected/range days keeps the main color (slightly darker) */
+        .flatpickr-day.selected:hover,
+        .flatpickr-day.startRange:hover,
+        .flatpickr-day.endRange:hover,
+        .flatpickr-day.selected.inRange:hover,
+        .flatpickr-day.startRange.inRange:hover,
+        .flatpickr-day.endRange.inRange:hover {
+            background: #e67362 !important; /* Slightly darker for hover on selected */
+            border: none !important; /* REMOVED ALL BORDERS */
+            color: white !important;
+        }
+
+        /* Specific styling for today's date if selected */
+        .flatpickr-day.today.selected {
+            background: #e67362 !important;
+            border: none !important; /* REMOVED ALL BORDERS */
+        }
+
+        /* Ensure disabled days are clearly distinct and unselectable */
+        .flatpickr-day.flatpickr-disabled {
+            color: #a0aec0 !important; /* Tailwind gray-500 for disabled dates */
+            background-color: #f3f4f6 !important; /* Light gray background for blocked days */
+            border: none !important; /* REMOVED ALL BORDERS */
+            cursor: not-allowed;
+            opacity: 0.8 !important; /* Make them slightly transparent to indicate unselectable */
+            text-decoration: line-through !important; /* Add strikethrough for clarity */
+        }
+
+        /* Crucial fix for nextMonthDay/prevMonthDay in range or as endRange */
+        /* Ensure prev/next month days that ARE in range get the inRange style */
+        .flatpickr-day.prevMonthDay.inRange,
+        .flatpickr-day.nextMonthDay.inRange {
+            background: rgba(255, 128, 108, 0.2) !important; /* Apply inRange background */
+            border: none !important; /* REMOVED ALL BORDERS */
+            color: #374151 !important; /* Apply inRange text color */
+            opacity: 1 !important; /* Ensure full opacity */
+            text-decoration: none !important; /* Remove strikethrough if it was applied */
+        }
+
+        /* Ensure prev/next month days that are the END of the range get the selected style */
+        .flatpickr-day.prevMonthDay.endRange,
+        .flatpickr-day.nextMonthDay.endRange {
+            background: #ff806c !important; /* Apply main color */
+            border: none !important; /* REMOVED ALL BORDERS */
+            color: white !important;
+            opacity: 1 !important;
+            text-decoration: none !important;
+        }
+
+        /* Box shadows for range ends to make them look connected */
+        /* These box shadows might have been interpreted as borders previously */
+        .flatpickr-day.selected.startRange + .inRange:not(.endRange) {
+            box-shadow: -2px 0 0 #ff806c;
+        }
+        .flatpickr-day.endRange.inRange:not(.startRange) {
+            box-shadow: 2px 0 0 #ff806c;
+        }
+
+        /* Ensure no borders on the weekday headers */
+        .flatpickr-weekdays,
+        .flatpickr-weekdaycontainer {
+            border: none !important;
+        }
+        .flatpickr-weekday {
+            border: none !important;
+            background: white !important; /* Ensure weekday background is white */
+        }
+
+        /* Custom style for checkboxes to force accent color */
+        input[type="checkbox"] {
+            accent-color: #ff806c; /* This sets the fill color of the checkbox */
+            width: 1.25rem; /* Equivalent to h-5 */
+            height: 1.25rem; /* Equivalent to w-5 */
+            min-width: 1.25rem; /* Ensure minimum width */
+            min-height: 1.25rem; /* Ensure minimum height */
+            vertical-align: middle; /* Align with text */
+        }
+        /* Ensure labels are aligned with checkboxes */
+        .extra-services-list label,
+        .required-services-list label {
+            display: inline-block;
+            vertical-align: middle;
+            margin-left: 0.75rem; /* ml-3 */
+        }
+
+        /* Loader Styles */
+        .loader {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 1rem;
+            color: #ff806c;
+            font-weight: bold;
+        }
+        .loader-spinner {
+            border: 4px solid #f3f3f3; /* Light grey */
+            border-top: 4px solid #ff806c; /* Your custom color */
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            animation: spin 1s linear infinite;
+            margin-right: 0.5rem;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="p-4 sm:p-8 flex flex-col items-center min-h-full">
+    <div class="calculator-container bg-white p-6 sm:p-8 rounded-xl shadow-lg w-full max-w-md md:max-w-lg lg:max-w-xl relative">
+        <h1 class="text-xl sm:text-2xl md:text-3xl font-bold text-center text-gray-800 mb-6">Tiny Rental Calculator</h1>
+        <!-- Updated disclaimer text below the title with highlighted words -->
+        <p class="text-center text-gray-600 text-sm">In <span class="text-[#ff806c]">low season</span> (March to November) the minimum rental is <span class="text-[#ff806c]">5 days</span> and in <span class="text-[#ff806c]">high season</span> (December to February) <span class="text-[#ff806c]">10 days</span>.</p>
+        <p class="text-center text-gray-600 text-sm mb-6">This quote is an estimate and needs to be confirmed with us.</p>
+
+        <div id="messageBox" class="message-box hidden"></div>
+
+        <div id="calculatorContent" class="">
+            <div class="space-y-4 mb-6">
+                <div>
+                    <label for="clientName" class="block text-sm sm:text-base font-semibold mb-2 text-gray-700">Your Name:</label>
+                    <input type="text" id="clientName" placeholder="Enter your name" required
+                           class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#ff806c] text-sm sm:text-base">
+                </div>
+                <div>
+                    <label for="nationalityInput" class="block text-sm sm:text-base font-semibold mb-2 text-gray-700">Your Nationality:</label>
+                    <input type="text" id="nationalityInput" placeholder="Enter your nationality" required
+                           class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#ff806c] text-sm sm:text-base">
+                    <span id="nationalityError" class="text-red-500 text-xs mt-1 hidden">Please enter your nationality.</span>
+                </div>
+                <div>
+                    <label for="clientEmail" class="block text-sm sm:text-base font-semibold mb-2 text-gray-700">Your Email:</label>
+                    <input type="email" id="clientEmail" placeholder="Enter your email" required
+                           class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#ff806c] text-sm sm:text-base">
+                    <span id="emailError" class="text-red-500 text-xs mt-1 hidden">Please enter a valid email address.</span>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 gap-4 mb-6">
+                <div class="input-group">
+                    <label for="dateRangePicker" class="block text-sm sm:text-base font-semibold mb-2 text-gray-700">Select Rental Dates:</label>
+                    <input type="text" id="dateRangePicker" placeholder="📅 Select start and end dates" required
+                           class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#ff806c] text-sm sm:text-base">
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-2"> <!-- Reduced margin-bottom here -->
+                <div class="input-group">
+                    <label for="pickupCity" class="block text-sm sm:text-base font-semibold mb-2 text-gray-700">Pickup City:</label>
+                    <select id="pickupCity"
+                                   class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#ff806c] text-sm sm:text-base">
+                        <option value="Santiago">Santiago</option>
+                        <option value="Puerto Montt (Extra Cost)">Puerto Montt (Extra Cost)</option>
+                        <option value="Punta Arenas (Extra Cost)">Punta Arenas (Extra Cost)</option>
+                        <option value="Calama (Extra Cost)">Calama (Extra Cost)</option>
+                    </select>
+                </div>
+                <div class="input-group">
+                    <label for="dropoffCity" class="block text-sm sm:text-base font-semibold mb-2 text-gray-700">Dropoff City:</label>
+                    <select id="dropoffCity"
+                                   class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#ff806c] text-sm sm:text-base">
+                        <option value="Santiago">Santiago</option>
+                        <option value="Puerto Montt (Extra Cost)">Puerto Montt (Extra Cost)</option>
+                        <option value="Punta Arenas (Extra Cost)">Punta Arenas (Extra Cost)</option>
+                        <option value="Calama (Extra Cost)">Calama (Extra Cost)</option>
+                    </select>
+                </div>
+            </div>
+            <!-- Updated text here -->
+            <p class="text-center text-gray-600 text-xs mb-6">Round-trip transportation in Santiago is free. In other cities, the cost of travel is calculated based on the origin and destination.</p>
+
+            <h2 class="text-lg sm:text-xl md:text-2xl font-semibold text-gray-800 mb-4">Extra Services</h2>
+            <div class="extra-services-list space-y-3 mb-6">
+                <div class="flex items-center">
+                    <input type="checkbox" id="kayak" name="extraService" value="Kayak + 2 Paddles + 2 Life Vests + Inflator"
+                           class="h-5 w-5 text-[#ff806c] rounded focus:ring-[#ff806c]">
+                    <label for="kayak" class="ml-3 text-sm sm:text-base text-gray-700">Kayak + 2 Paddles + 2 Life Vests + Inflator (USD 12.8/day)</label>
+                </div>
+                <div class="flex items-center">
+                    <input type="checkbox" id="standupPadel" name="extraService" value="Standup Paddle + 1 Paddle + 2 Life Vests + Inflator"
+                           class="h-5 w-5 text-[#ff806c] rounded focus:ring-[#ff806c]">
+                    <label for="standupPadel" class="ml-3 text-sm sm:text-base text-gray-700">Standup Paddle + 1 Paddle + 2 Life Vests + Inflator (USD 10.6/day)</label>
+                </div>
+                <div class="flex items-center">
+                    <input type="checkbox" id="starlink" name="extraService" value="Starlink"
+                           class="h-5 w-5 text-[#ff806c] rounded focus:ring-[#ff806c]">
+                    <label for="starlink" class="ml-3 text-sm sm:text-base text-gray-700">Starlink (USD 100 every 30 days)</label>
+                </div>
+                <div class="flex items-center">
+                    <input type="checkbox" id="childSeat" name="extraService" value="Child Seat"
+                           class="h-5 w-5 text-[#ff806c] rounded focus:ring-[#ff806c]">
+                    <label for="childSeat" class="ml-3 text-sm sm:text-base text-gray-700">Child Seat (USD 5.3/day)</label>
+                </div>
+                <div class="flex items-center">
+                    <input type="checkbox" id="cruceArgentina" name="extraService" value="Argentina Crossing + International Insurance"
+                           class="h-5 w-5 text-[#ff806c] rounded focus:ring-[#ff806c]">
+                    <label for="cruceArgentina" class="ml-3 text-sm sm:text-base text-gray-700">Argentina Crossing (USD 192) + International Insurance</label>
+                </div>
+                <div class="flex items-center">
+                    <input type="checkbox" id="taxiAeropuerto" name="extraService" value="Airport Taxi SCL (one way)"
+                           class="h-5 w-5 text-[#ff806c] rounded focus:ring-[#ff806c]">
+                    <label for="taxiAeropuerto" class="ml-3 text-sm sm:text-base text-gray-700">Airport Taxi SCL (one way) (USD 100)</label>
+                </div>
+                <div class="flex items-center">
+                    <input type="checkbox" id="unlimitedKMs" name="extraService" value="Unlimited Kilometers"
+                           class="h-5 w-5 text-[#ff806c] rounded focus:ring-[#ff806c]">
+                    <label for="unlimitedKMs" class="ml-3 text-sm sm:text-base text-gray-700">Unlimited Kilometers (USD 10/day)</label>
+                </div>
+            </div>
+
+            <h2 class="text-lg sm:text-xl md:text-2xl font-semibold text-gray-800 mb-4">Required Services</h2>
+            <div class="required-services-list space-y-3 mb-6">
+                <div id="tagSantiagoContainer" class="flex items-center">
+                    <input type="checkbox" id="tagSantiago" name="requiredService" value="TAG Santiago"
+                           class="h-5 w-5 text-[#ff806c] rounded focus:ring-[#ff806c]">
+                    <label for="tagSantiago" class="ml-3 text-sm sm:text-base text-gray-700">TAG Santiago (USD 50 - includes 2 days)</label>
+                </div>
+                <div class="flex items-center">
+                    <input type="checkbox" id="cleaningFee" name="requiredService" value="Cleaning Fee" checked disabled
+                           class="h-5 w-5 text-[#ff806c] rounded focus:ring-[#ff806c]">
+                    <label for="cleaningFee" class="ml-3 text-sm sm:text-base text-gray-700">Cleaning Fee (USD 43)</label>
+                </div>
+            </div>
+
+            <button id="calculateButton"
+                    class="w-full bg-[#ff806c] hover:bg-[#e67362] text-white font-bold py-3 px-6 rounded-lg shadow-md transition duration-300 ease-in-out transform hover:scale-105 text-base sm:text-lg">
+                Calculate Quote
+            </button>
+
+            <div id="loader" class="loader hidden">
+                <div class="loader-spinner"></div>
+                Calculating...
+            </div>
+
+            <div class="results bg-gray-50 p-6 rounded-lg mt-8 shadow-inner" id="resultsSection">
+                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4">
+                    <h3 class="text-lg sm:text-xl md:text-2xl font-semibold text-gray-800 mb-2 sm:mb-0">Rental Summary</h3>
+                    </div>
+
+                <div class="flex flex-col mb-2">
+                    <p class="text-sm sm:text-base text-gray-700">Number of Days:</p>
+                    <span id="displayDays" class="font-bold text-base sm:text-lg">0</span>
+                </div>
+                <div id="highSeasonDaysRow" class="flex flex-col mb-2 hidden">
+                    <p class="text-sm sm:text-base text-gray-700">High Season Days:</p>
+                    <span id="displayHighSeasonDays" class="font-bold text-base sm:text-lg">0</span>
+                </div>
+                <div id="lowSeasonDaysRow" class="flex flex-col mb-2 hidden">
+                    <p class="text-sm sm:text-base text-gray-700">Low Season Days:</p>
+                    <span id="displayLowSeasonDays" class="font-bold text-base sm:text-lg">0</span>
+                </div>
+                <div class="flex flex-col mb-2">
+                    <p class="text-sm sm:text-base text-gray-700">Rental Price:</p>
+                    <span id="displayTotalBaseRental" class="font-bold text-[#ff806c] text-base sm:text-lg">USD 0.00</span>
+                </div>
+                <!-- Relocation Fee is now its own line item here -->
+                <div id="transferRow" class="flex flex-col mb-2 hidden">
+                    <p class="text-sm sm:text-base text-gray-700">Camper Relocation Fee:</p>
+                    <span id="displayTransferCost" class="font-bold text-[#ff806c] text-base sm:text-lg">USD 0.00</span>
+                </div>
+                <div id="totalOptionalExtrasRow" class="flex flex-col mb-2 hidden">
+                    <p class="text-sm sm:text-base text-gray-700">Optional Services:</p>
+                    <span id="displayTotalOptionalExtras" class="font-bold text-[#ff806c] text-base sm:text-lg">USD 0.00</span>
+                </div>
+                <div id="totalRequiredServicesRow" class="flex flex-col mb-2 hidden">
+                    <p class="text-sm sm:text-base text-gray-700">Required Services:</p>
+                    <span id="displayTotalRequiredServices" class="font-bold text-[#ff806c] text-base sm:text-lg">USD 0.00</span>
+                </div>
+                <div class="flex flex-col mb-2 hidden" id="discountRow">
+                    <p class="text-sm sm:text-base text-gray-700">Discount 15+ days trip 😊:</p>
+                    <span id="displayDiscount" class="font-bold text-gray-700 text-base sm:text-lg">USD 0.00</span>
+                </div>
+                <div class="flex flex-col mt-4">
+                    <p class="text-base sm:text-lg md:text-xl font-bold text-gray-900">Total:</p>
+                    <span id="displayGrandTotal" class="text-[#e67362] text-lg sm:text-xl md:text-2xl">USD 0.00</span>
+                </div>
+                <p id="disclaimerText" class="text-xs text-gray-500 mt-2 hidden"></p>
+
+                <button id="shareQuoteButton"
+                        class="mt-6 w-full bg-white border border-[#ff806c] text-[#ff806c] hover:bg-[#e67362] hover:text-white hover:border-[#e67362] font-bold py-3 px-6 rounded-lg shadow-md transition duration-300 ease-in-out transform hover:scale-105 text-base sm:text-lg flex items-center justify-center">
+                    <span class="mr-2">↪️</span> Share Quote
+                </button>
+                <!-- Se ha eliminado el div contactSuccessMessage ya que la función de envío de correos se ha eliminado -->
+            </div>
+        </div>
+    </div>
+
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js" integrity="sha256-/JqT3SQfawRcv/BIHPThkBvs0OEvtFFmqPF/lYI/Cxo=" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    <script>
+        // Season pricing definition
+        const seasonalPrices = {
+            highSeason: 225, // USD per day in high season
+            lowSeason: 190    // USD per day in low season
+        };
+
+        // Optional services definition
+        const optionalServices = {
+            "Kayak + 2 Paddles + 2 Life Vests + Inflator": { type: "daily", price: 12.8 },
+            "Standup Paddle + 1 Paddle + 2 Life Vests + Inflator": { type: "daily", price: 10.6 },
+            "Starlink": { type: "per_30_days", price: 100 },
+            "Child Seat": { type: "daily", price: 5.3 },
+            "Argentina Crossing + International Insurance": { type: "one_time", price: 192 }, // Updated service name
+            "Airport Taxi SCL (one way)": { type: "one_time", price: 100 }, // Price is fixed, no quantity
+            "Unlimited Kilometers": { type: "daily", price: 10 }
+        };
+
+        // Required services definition
+        const requiredServices = {
+            "TAG Santiago": { type: "per_santiago_day", price_per_day: 25 }, // Price per Santiago day
+            "Cleaning Fee": { type: "one_time", price: 43 }
+        };
+
+        // Define base relocation costs for each "Extra Cost" city (one way from/to Santiago)
+        const cityRelocationBaseCosts = {
+            "Puerto Montt (Extra Cost)": 850,
+            "Punta Arenas (Extra Cost)": 1550,
+            "Calama (Extra Cost)": 1200
+        };
+
+        // Global variables
+        let lastCalculatedQuote = {};
+        // Se ha eliminado la variable isContactFormSubmitted ya que la función de envío de correos se ha eliminado
+        let clientContactData = { // Store contact data
+            name: '',
+            nationality: '',
+            email: ''
+        };
+
+        // Function to display messages to the user (replaces alert())
+        function showMessage(msg, isError = false, buttonElement = null, permanent = false) { // Added permanent parameter
+            // If a button element is provided, display the message on the button itself
+            if (buttonElement) {
+                const originalText = buttonElement.innerHTML; // Store original HTML to preserve emoji
+                const originalClasses = buttonElement.className; // Store original classes
+
+                // Apply new classes for feedback
+                // Remove existing color/border classes to apply new ones cleanly
+                buttonElement.classList.remove('bg-[#ff806c]', 'hover:bg-[#e67362]', 'text-white', 'border-[#ff806c]', 'hover:border-[#e67362]', 'bg-white');
+                buttonElement.classList.add('transition-none'); // Disable transition for immediate color change
+
+                if (isError) {
+                    buttonElement.classList.add('bg-red-500', 'text-white', 'border-red-500');
+                    buttonElement.innerHTML = msg;
+                } else {
+                    // Custom style for permanent success state (no longer used for contact form, but kept for general message box)
+                    if (permanent) {
+                        buttonElement.classList.add('bg-gray-300', 'text-gray-800', 'border-gray-300'); // Light grey background, dark text
+                        buttonElement.innerHTML = msg + ' 😎'; // Add sunglasses emoji
+                    } else {
+                        buttonElement.classList.add('bg-green-500', 'text-white', 'border-green-500');
+                        buttonElement.innerHTML = msg;
+                    }
+                }
+                buttonElement.disabled = true; // Disable button during message display
+
+                if (!permanent) { // Only set timeout if not permanent
+                    setTimeout(() => {
+                        // Restore original classes and text
+                        buttonElement.className = originalClasses; // Restore original classes (including hover effects)
+                        buttonElement.innerHTML = originalText; // Restore original text
+                        buttonElement.disabled = false; // Re-enable button
+                    }, 3000); // Message display duration
+                }
+            } else {
+                // Fallback to a general message box if no button element is provided (e.g., for general form errors)
+                // This fallback is kept in case there are other non-button related messages.
+                const messageBox = document.getElementById('messageBox'); // Get the messageBox element
+                messageBox.innerText = msg;
+                messageBox.classList.remove('hidden');
+                if (isError) {
+                    messageBox.classList.add('error');
+                } else {
+                    messageBox.classList.remove('error');
+                }
+                setTimeout(() => {
+                    messageBox.classList.add('hidden');
+                }, 3000);
+            }
+        }
+
+        // Function to validate email format
+        function isValidEmail(email) {
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            return emailRegex.test(email);
+        }
+
+        // Helper function to convert USD to selected currency for DISPLAY
+        function formatCurrency(usdAmount) {
+            let options = {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+                useGrouping: true
+            };
+            return `USD ${parseFloat(usdAmount).toLocaleString('en-US', options)}`;
+        }
+
+        // Helper function to convert USD to selected currency for COPYING (more universal format)
+        function formatCurrencyForCopy(usdAmount) {
+            let options = {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+                useGrouping: false
+            };
+            return `USD ${parseFloat(usdAmount).toLocaleString('en-US', options)}`;
+        }
+
+        // Main function to calculate rental price
+        function calculateRentalPrice() {
+            console.log("--- calculateRentalPrice() started ---");
+            const clientName = document.getElementById('clientName').value.trim();
+            const nationalityInput = document.getElementById('nationalityInput');
+            const clientEmail = document.getElementById('clientEmail').value.trim();
+
+            const nationalityError = document.getElementById('nationalityError');
+            const emailError = document.getElementById('emailError');
+
+            // Validate new mandatory fields
+            if (!clientName) {
+                showMessage("Please enter your Name.", true, document.getElementById('calculateButton'));
+                console.log("Validation failed: Name empty. Returning.");
+                return;
+            }
+            // Check if nationality input is empty
+            if (!nationalityInput.value.trim()) {
+                nationalityError.classList.remove('hidden');
+                showMessage("Please enter your Nationality.", true, document.getElementById('calculateButton'));
+                console.log("Validation failed: Nationality empty");
+                return;
+            } else {
+                nationalityError.classList.add('hidden');
+            }
+            if (!clientEmail || !isValidEmail(clientEmail)) {
+                emailError.classList.remove('hidden');
+                showMessage("Please enter a valid Email address.", true, document.getElementById('calculateButton'));
+                console.log("Validation failed: Email invalid");
+                return;
+            } else {
+                emailError.classList.add('hidden');
+            }
+
+            // Store contact data globally
+            clientContactData.name = clientName;
+            clientContactData.nationality = nationalityInput.value.trim();
+            clientContactData.email = clientEmail;
+
+            console.log("Contact data:", clientContactData);
+
+            const dateRangePicker = document.getElementById('dateRangePicker');
+            const selectedDates = dateRangePicker._flatpickr.selectedDates;
+            console.log("Selected Dates:", selectedDates);
+
+            const discountRow = document.getElementById('discountRow');
+            const transferRow = document.getElementById('transferRow');
+            const displayTransferCost = document.getElementById('displayTransferCost');
+            const pickupCity = document.getElementById('pickupCity').value;
+            const dropoffCity = document.getElementById('dropoffCity').value;
+            const tagSantiagoCheckbox = document.getElementById('tagSantiago');
+            const tagSantiagoLabel = document.querySelector('label[for="tagSantiago"]');
+            const tagSantiagoContainer = document.getElementById('tagSantiagoContainer');
+            const cleaningFeeCheckbox = document.getElementById('cleaningFee');
+            const loader = document.getElementById('loader');
+            const disclaimerTextElement = document.getElementById('disclaimerText');
+            const shareButton = document.getElementById('shareQuoteButton');
+            // Se ha eliminado la variable contactSuccessMessage
+
+            // Show loader and hide results/form immediately
+            loader.classList.remove('hidden');
+            document.querySelector('.results').classList.add('hidden');
+            disclaimerTextElement.classList.add('hidden'); // Hide disclaimer initially
+            shareButton.classList.add('hidden'); // Hide share button initially
+
+            // Ensure contact success message is hidden initially for new calculations (variable and logic removed)
+
+
+            // Reset last calculated quote
+            lastCalculatedQuote = {};
+
+            // Use a setTimeout to allow the loader to render before heavy calculation
+            setTimeout(() => {
+                if (selectedDates.length !== 2) {
+                    showMessage("Please select both start and end dates from the calendar.", true, document.getElementById('calculateButton'));
+                    console.log("Validation failed: Dates not selected");
+                    discountRow.classList.add('hidden');
+                    transferRow.classList.add('hidden');
+                    document.getElementById('highSeasonDaysRow').classList.add('hidden');
+                    document.getElementById('lowSeasonDaysRow').classList.add('hidden');
+                    document.getElementById('totalOptionalExtrasRow').classList.add('hidden');
+                    document.getElementById('totalRequiredServicesRow').classList.add('hidden');
+                    tagSantiagoContainer.classList.add('hidden');
+                    disclaimerTextElement.classList.add('hidden');
+                    shareButton.classList.add('hidden'); // Ensure share button is hidden on error
+                    loader.classList.add('hidden');
+                    document.querySelector('.results').classList.remove('hidden');
+                    return;
+                }
+
+                const startDate = selectedDates[0];
+                const endDate = selectedDates[1];
+
+                if (startDate > endDate) {
+                    showMessage("End date must be after or on the start date.", true, document.getElementById('calculateButton'));
+                    console.log("Validation failed: End date before start date");
+                    discountRow.classList.add('hidden');
+                    transferRow.classList.add('hidden');
+                    document.getElementById('highSeasonDaysRow').classList.add('hidden');
+                    document.getElementById('lowSeasonDaysRow').classList.add('hidden');
+                    document.getElementById('totalOptionalExtrasRow').classList.add('hidden');
+                    document.getElementById('totalRequiredServicesRow').classList.add('hidden');
+                    tagSantiagoContainer.classList.add('hidden');
+                    disclaimerTextElement.classList.add('hidden');
+                    shareButton.classList.add('hidden'); // Ensure share button is hidden on error
+                    loader.classList.add('hidden');
+                    document.querySelector('.results').classList.remove('hidden');
+                    return;
+                }
+
+                const MS_PER_DAY = 1000 * 60 * 60 * 24;
+                // Calculate number of days including both start and end dates
+                const numberOfDays = Math.round(Math.abs((endDate - startDate) / MS_PER_DAY)) + 1;
+                console.log("Number of Days:", numberOfDays);
+
+                let highSeasonDays = 0;
+                let lowSeasonDays = 0;
+
+                for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
+                    const month = d.getMonth();
+                    // High season: December (11), January (0), February (1)
+                    if (month === 11 || month === 0 || month === 1) {
+                        highSeasonDays++;
+                    } else { // Low season: March (2) to November (10)
+                        lowSeasonDays++;
+                    }
+                }
+                console.log("High Season Days:", highSeasonDays, "Low Season Days:", lowSeasonDays);
+
+                // NEW VALIDATION LOGIC for minimum rental days based on season
+                const minLowSeasonDays = 5;
+                const minHighSeasonDays = 10;
+                let isValidDuration = true;
+                let validationMessage = "";
+
+                if (highSeasonDays > 0) { // If the selection includes any high season day
+                    if (numberOfDays < minHighSeasonDays) {
+                        isValidDuration = false;
+                        validationMessage = `For rentals including high season (December to February), the minimum is ${minHighSeasonDays} days.`;
+                    }
+                } else { // It's purely low season (lowSeasonDays will be > 0)
+                    if (numberOfDays < minLowSeasonDays) {
+                        isValidDuration = false;
+                        validationMessage = `For low season rentals (March to November), the minimum is ${minLowSeasonDays} days.`;
+                    }
+                }
+
+                if (!isValidDuration) {
+                    showMessage(validationMessage, true, document.getElementById('calculateButton'));
+                    console.log("Validation failed: Duration not met. Returning.");
+                    // Hide all relevant result rows and elements when validation fails
+                    discountRow.classList.add('hidden');
+                    transferRow.classList.add('hidden');
+                    document.getElementById('highSeasonDaysRow').classList.add('hidden');
+                    document.getElementById('lowSeasonDaysRow').classList.add('hidden');
+                    document.getElementById('totalOptionalExtrasRow').classList.add('hidden');
+                    document.getElementById('totalRequiredServicesRow').classList.add('hidden');
+                    tagSantiagoContainer.classList.add('hidden');
+                    disclaimerTextElement.classList.add('hidden');
+                    shareButton.classList.add('hidden');
+                    loader.classList.add('hidden');
+                    document.querySelector('.results').classList.remove('hidden');
+                    return;
+                }
+
+                let baseRentalPriceWithoutAnyDiscount = (highSeasonDays * seasonalPrices.highSeason) + (lowSeasonDays * seasonalPrices.lowSeason);
+                console.log("Base Rental Price (before discount):", baseRentalPriceWithoutAnyDiscount);
+
+                let totalOptionalServicesCost = 0;
+                const optionalServicesDetails = [];
+
+                // --- Handle Optional Services ---
+                const selectedOptionalServiceCheckboxes = Array.from(document.querySelectorAll('.extra-services-list input[name="extraService"]:checked'));
+                selectedOptionalServiceCheckboxes.forEach(checkbox => {
+                    const serviceName = checkbox.value;
+                    const service = optionalServices[serviceName];
+                    let serviceQuantity = 1; // Initialize serviceQuantity here
+                    if (service) {
+                        let serviceCost = 0;
+                        // For "Airport Taxi SCL (one way)", it's always a one-time fixed cost, no quantity multiplier
+                        if (service.type === "one_time" && serviceName === "Airport Taxi SCL (one way)") {
+                            serviceCost = service.price; // Fixed price, no quantity
+                        } else if (service.type === "one_time") {
+                            serviceCost = service.price;
+                        } else if (service.type === "daily") {
+                            serviceCost = service.price * numberOfDays;
+                        } else if (service.type === "per_30_days") {
+                            const thirtyDayBlocks = Math.ceil(numberOfDays / 30);
+                            serviceCost = service.price * thirtyDayBlocks;
+                            serviceQuantity = thirtyDayBlocks;
+                        }
+
+                        if (serviceCost > 0) {
+                            optionalServicesDetails.push({ name: serviceName, cost: serviceCost, quantity: serviceQuantity, type: service.type });
+                        }
+                    }
+                });
+                totalOptionalServicesCost = optionalServicesDetails.reduce((sum, service) => sum + service.cost, 0);
+                console.log("Total Optional Services Cost:", totalOptionalServicesCost);
+
+
+                let totalRequiredServicesCost = 0;
+                const requiredServicesDetails = [];
+
+                // --- Handle Cleaning Fee (always checked and disabled) ---
+                cleaningFeeCheckbox.checked = true;
+                cleaningFeeCheckbox.disabled = true;
+                totalRequiredServicesCost += requiredServices["Cleaning Fee"].price;
+                requiredServicesDetails.push({ name: "Cleaning Fee", cost: requiredServices["Cleaning Fee"].price, quantity: 1, type: "one_time" });
+
+                // --- Handle TAG Santiago (conditional based on cities) ---
+                let tagSantiagoCost = 0;
+                let santiagoIsPickup = (pickupCity === 'Santiago');
+                let santiagoIsDropoff = (dropoffCity === 'Santiago');
+
+                if (santiagoIsPickup || santiagoIsDropoff) {
+                    tagSantiagoContainer.classList.remove('hidden'); // Show the TAG Santiago row
+                    tagSantiagoCheckbox.checked = true; // Always checked if Santiago is involved
+                    tagSantiagoCheckbox.disabled = true; // Always disabled if Santiago is involved
+
+                    if (santiagoIsPickup && santiagoIsDropoff) { // Both cities are Santiago
+                        tagSantiagoCost = requiredServices["TAG Santiago"].price_per_day * 2; // USD 50
+                        tagSantiagoLabel.innerHTML = `TAG Santiago (USD ${tagSantiagoCost} - includes 2 days)`;
+                    } else { // Only one city is Santiago
+                        tagSantiagoCost = requiredServices["TAG Santiago"].price_per_day; // USD 25
+                        tagSantiagoLabel.innerHTML = `TAG Santiago (USD ${tagSantiagoCost} - includes 1 day)`;
+                    }
+                    requiredServicesDetails.push({ name: "TAG Santiago", cost: tagSantiagoCost, quantity: (santiagoIsPickup && santiagoIsDropoff ? 2 : 1), type: "per_santiago_day" });
+                } else {
+                    // If no Santiago city is selected, hide the TAG Santiago row
+                    tagSantiagoContainer.classList.add('hidden');
+                    tagSantiagoCheckbox.checked = false; // Ensure it's unchecked when hidden
+                    tagSantiagoCheckbox.disabled = false; // Ensure it's not disabled if it were to reappear
+                    tagSantiagoCost = 0; // No cost
+                }
+                totalRequiredServicesCost += tagSantiagoCost;
+                console.log("Total Required Services Cost (excluding relocation fee):", totalRequiredServicesCost);
+
+
+                // --- Handle Transfer Cost (conditional based on cities) ---
+                let transferCost = 0;
+                let transferCostDisplayValue = "N/A"; // Default display for no transfer cost
+
+                // Get cleaned city names (without "(Extra Cost)") for easier comparison
+                const cleanedPickupCity = pickupCity.replace(' (Extra Cost)', '');
+                const cleanedDropoffCity = dropoffCity.replace(' (Extra Cost)', '');
+
+                if (cleanedPickupCity === cleanedDropoffCity) {
+                    // Same city pickup and dropoff
+                    if (cleanedPickupCity !== 'Santiago') {
+                        // Round trip for non-Santiago "Extra Cost" cities
+                        transferCost = cityRelocationBaseCosts[pickupCity] * 2;
+                    }
+                    // Santiago to Santiago remains 0
+                } else if (cleanedPickupCity === 'Santiago') {
+                    // Pickup is Santiago, dropoff is an "Extra Cost" city
+                    transferCost = cityRelocationBaseCosts[dropoffCity];
+                } else if (cleanedDropoffCity === 'Santiago') {
+                    // Dropoff is Santiago, pickup is an "Extra Cost" city
+                    transferCost = cityRelocationBaseCosts[pickupCity];
+                } else {
+                    // Both pickup and dropoff are "Extra Cost" cities (and different)
+                    transferCost = cityRelocationBaseCosts[pickupCity] + cityRelocationBaseCosts[dropoffCity];
+                }
+
+
+                if (transferCost > 0) {
+                    transferCostDisplayValue = formatCurrency(transferCost); // Format the actual cost
+                    displayTransferCost.innerText = transferCostDisplayValue;
+                    transferRow.classList.remove('hidden');
+                    // IMPORTANT CHANGE: Do NOT add to requiredServicesDetails here to prevent double-listing
+                    // in the "Required Services" section, but still add to the grand total.
+                } else {
+                    transferRow.classList.add('hidden'); // Hide if no transfer cost
+                }
+                console.log("Calculated Transfer Cost:", transferCost);
+
+
+                // Calculate subtotal BEFORE applying the global discount (Base + Optional Extras + Required Services + Transfer Cost)
+                // The transferCost is now added directly here to the subtotal, ensuring it's part of the grand total
+                // but not explicitly listed under "Required Services" details.
+                let subtotalBeforeGlobalDiscount = baseRentalPriceWithoutAnyDiscount + totalOptionalServicesCost + totalRequiredServicesCost + transferCost;
+                console.log("Subtotal Before Discount:", subtotalBeforeGlobalDiscount);
+
+                let discountAmount = 0;
+                // Changed discount threshold from 10 to 15 days
+                if (numberOfDays >= 15) {
+                    discountAmount = subtotalBeforeGlobalDiscount * 0.10;
+                }
+                console.log("Discount Amount:", discountAmount);
+
+                // Final total after applying the global discount
+                let grandTotal = subtotalBeforeGlobalDiscount - discountAmount;
+                console.log("Grand Total:", grandTotal);
+
+                // --- Convert all final display values to selected currency ---
+                const convertedBaseRentalPrice = formatCurrency(baseRentalPriceWithoutAnyDiscount);
+                const convertedOptionalServicesCost = formatCurrency(totalOptionalServicesCost);
+                const convertedRequiredServicesCost = formatCurrency(totalRequiredServicesCost); // This total now excludes relocation fee
+                const convertedDiscountAmount = formatCurrency(discountAmount);
+                const convertedGrandTotal = formatCurrency(grandTotal);
+
+
+                // Store calculated details for booking request (store original USD values and selected currency for backend)
+                lastCalculatedQuote = {
+                    name: clientContactData.name,
+                    nationality: clientContactData.nationality,
+                    email: clientContactData.email,
+                    startDate: startDate.toISOString().split('T')[0],
+                    endDate: endDate.toISOString().split('T')[0],
+                    numberOfDays: numberOfDays,
+                    highSeasonDays: highSeasonDays,
+                    lowSeasonDays: lowSeasonDays,
+                    baseRentalPriceBeforeDiscount: parseFloat(baseRentalPriceWithoutAnyDiscount.toFixed(2)), // Store as number
+                    discountAmount: parseFloat(discountAmount.toFixed(2)), // Store as number
+                    optionalServicesCost: parseFloat(totalOptionalServicesCost.toFixed(2)), // Store as number
+                    // Store required services cost WITHOUT relocation fee here, as relocation is separate
+                    requiredServicesCost: parseFloat(totalRequiredServicesCost.toFixed(2)),
+                    selectedOptionalServices: optionalServicesDetails,
+                    // The requiredServicesDetails array here will NOT include "Camper Relocation Fee"
+                    selectedRequiredServices: requiredServicesDetails,
+                    transferCost: parseFloat(transferCost.toFixed(2)), // Store relocation fee separately
+                    grandTotal: parseFloat(grandTotal.toFixed(2)), // Store as number
+                    currency: "USD", // Fixed to USD
+                    pickupCity: pickupCity, // Store pickup city
+                    dropoffCity: dropoffCity // Store dropoff city
+                };
+                console.log("Final lastCalculatedQuote:", lastCalculatedQuote);
+
+                // Display results in the UI
+                document.getElementById('displayDays').innerText = `${numberOfDays} days`;
+
+                const highSeasonDaysRow = document.getElementById('highSeasonDaysRow');
+                const lowSeasonDaysRow = document.getElementById('lowSeasonDaysRow');
+                const totalOptionalExtrasRow = document.getElementById('totalOptionalExtrasRow');
+                const totalRequiredServicesRow = document.getElementById('totalRequiredServicesRow');
+
+
+                if (highSeasonDays > 0) {
+                    document.getElementById('displayHighSeasonDays').innerText = `${highSeasonDays} days`;
+                    highSeasonDaysRow.classList.remove('hidden');
+                } else {
+                    highSeasonDaysRow.classList.add('hidden');
+                }
+
+                if (lowSeasonDays > 0) {
+                    document.getElementById('displayLowSeasonDays').innerText = `${lowSeasonDays} days`;
+                    lowSeasonDaysRow.classList.remove('hidden');
+                } else {
+                    lowSeasonDaysRow.classList.add('hidden');
+                }
+
+                document.getElementById('displayTotalBaseRental').innerText = formatCurrency(lastCalculatedQuote.baseRentalPriceBeforeDiscount);
+
+                // Transfer cost display is handled above by `displayTransferCost.innerText`
+
+                // Display Optional Services total
+                if (lastCalculatedQuote.optionalServicesCost > 0 || optionalServicesDetails.length > 0) {
+                    document.getElementById('displayTotalOptionalExtras').innerText = formatCurrency(lastCalculatedQuote.optionalServicesCost);
+                    totalOptionalExtrasRow.classList.remove('hidden');
+                } else {
+                    totalOptionalExtrasRow.classList.add('hidden');
+                }
+
+                // Display Required Services total (now without the relocation fee)
+                if (lastCalculatedQuote.requiredServicesCost > 0 || requiredServicesDetails.length > 0) {
+                    document.getElementById('displayTotalRequiredServices').innerText = formatCurrency(lastCalculatedQuote.requiredServicesCost);
+                    totalRequiredServicesRow.classList.remove('hidden');
+                } else {
+                    totalRequiredServicesRow.classList.add('hidden');
+                }
+
+
+                if (lastCalculatedQuote.discountAmount > 0) {
+                    document.getElementById('displayDiscount').innerText = `- ${formatCurrency(lastCalculatedQuote.discountAmount)}`;
+                    discountRow.classList.remove('hidden');
+                } else {
+                    discountRow.classList.add('hidden');
+                }
+
+                document.getElementById('displayGrandTotal').innerText = formatCurrency(lastCalculatedQuote.grandTotal);
+
+                // Update disclaimer text based on selected currency
+                document.getElementById('disclaimerText').innerText = "Prices are in USD. This quote is an estimate and needs to be confirmed with us.";
+                disclaimerTextElement.classList.remove('hidden'); // Ensure disclaimer is visible
+
+                // Hide loader and show results/form
+                loader.classList.add('hidden');
+                document.querySelector('.results').classList.remove('hidden');
+                shareButton.classList.remove('hidden'); // Show share button after calculation
+
+                // Se ha eliminado la llamada a sendBookingRequest()
+
+                // Scroll to results section
+                document.getElementById('resultsSection').scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+            }, 1000); // 1 second delay
+        }
+
+        // Function to generate the shareable text for both share and email
+        function generateQuoteShareText() {
+            if (!lastCalculatedQuote.grandTotal) {
+                return ""; // Should not happen if called after calculation
+            }
+
+            const formattedGrandTotalForCopy = formatCurrencyForCopy(lastCalculatedQuote.grandTotal);
+
+            let shareText = `Rental Quote Summary:\n\n`;
+            shareText += `Name: ${lastCalculatedQuote.name}\n`;
+            shareText += `Nationality: ${lastCalculatedQuote.nationality}\n`;
+            shareText += `Email: ${lastCalculatedQuote.email}\n\n`;
+            shareText += `Dates: ${lastCalculatedQuote.startDate} to ${lastCalculatedQuote.endDate} (${lastCalculatedQuote.numberOfDays} days)\n`;
+            shareText += `Pickup: ${lastCalculatedQuote.pickupCity}\n`;
+            shareText += `Dropoff: ${lastCalculatedQuote.dropoffCity}\n`;
+            shareText += `Base Rental Price: ${formatCurrencyForCopy(lastCalculatedQuote.baseRentalPriceBeforeDiscount)}\n`;
+
+            // Include Relocation Fee separately if it exists
+            if (parseFloat(lastCalculatedQuote.transferCost) > 0) {
+                shareText += `Camper Relocation Fee: ${formatCurrencyForCopy(lastCalculatedQuote.transferCost)}\n`;
+            }
+
+            if (lastCalculatedQuote.selectedOptionalServices && lastCalculatedQuote.selectedOptionalServices.length > 0) {
+                shareText += `\nOptional Services:\n`;
+                lastCalculatedQuote.selectedOptionalServices.forEach(service => {
+                    shareText += `- ${service.name}: ${formatCurrencyForCopy(service.cost)}\n`;
+                });
+            }
+
+            // This section now only includes Cleaning Fee and TAG Santiago, not Relocation Fee
+            if (lastCalculatedQuote.selectedRequiredServices && lastCalculatedQuote.selectedRequiredServices.length > 0) {
+                shareText += `\nRequired Services:\n`;
+                lastCalculatedQuote.selectedRequiredServices.forEach(service => {
+                    shareText += `- ${service.name}: ${formatCurrencyForCopy(service.cost)}\n`;
+                });
+            }
+
+            // Updated text for discount in shareable text
+            if (parseFloat(lastCalculatedQuote.discountAmount) > 0) {
+                shareText += `Discount 15+ days trip: -${formatCurrencyForCopy(lastCalculatedQuote.discountAmount)}\n`;
+            }
+
+            shareText += `\nTotal Estimated Price: ${formattedGrandTotalForCopy}\n`;
+            shareText += `\n${document.getElementById('disclaimerText').innerText}`; // Include disclaimer
+
+            return shareText;
+        }
+
+        // Function to share the calculated quote
+        async function shareQuote() {
+            const shareText = generateQuoteShareText();
+            const shareButton = document.getElementById('shareQuoteButton'); // Get button element
+            if (!shareText) {
+                showMessage("Please calculate a quote first to share.", true, shareButton);
+                return;
+            }
+
+            if (navigator.share) {
+                try {
+                    await navigator.share({
+                        title: 'Tiny Rental Calculator Quote',
+                        text: shareText,
+                        url: window.location.href // Share the current page URL
+                    });
+                    showMessage('Quote shared successfully!', false, shareButton);
+                }
+                catch (error) {
+                    if (error.name === 'AbortError') {
+                        // User cancelled the share operation, do nothing or show a subtle message
+                    } else {
+                        // If share fails for any other reason, directly copy to clipboard and show success message
+                        console.error('Error sharing:', error);
+                        copyTextToClipboard(shareText, buttonElement); // Pass button element
+                    }
+                }
+            } else {
+                // Fallback for browsers that do not support Web Share API
+                copyTextToClipboard(shareText, buttonElement); // Pass button element
+            }
+        }
+
+        // Se ha eliminado la función sendBookingRequest() completa.
+
+        // Fallback function to copy text to clipboard
+        function copyTextToClipboard(text, buttonElement) {
+            const textarea = document.createElement('textarea');
+            textarea.value = text;
+            textarea.style.position = 'fixed'; // Avoid scrolling to bottom
+            textarea.style.left = '-9999px'; // Move off-screen
+            document.body.appendChild(textarea);
+            textarea.select();
+            try {
+                document.execCommand('copy');
+                showMessage('Quote copied to clipboard! You can now paste it anywhere!', false, buttonElement);
+            } catch (err) {
+                console.error('Failed to copy text: ', err);
+                showMessage('Failed to copy quote. Please manually copy the following text:\n\n' + text, true, buttonElement);
+            }
+            document.body.removeChild(textarea);
+        }
+
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const today = new Date();
+            const minBookingDate = new Date();
+            minBookingDate.setDate(today.getDate() + 10);
+
+            flatpickr("#dateRangePicker", {
+                mode: "range",
+                minDate: minBookingDate,
+                dateFormat: "Y-m-d",
+            });
+
+            // Event listener for nationality change to hide error message (now for text input)
+            document.getElementById('nationalityInput').addEventListener('blur', function() {
+                const nationalityError = document.getElementById('nationalityError');
+                if (this.value.trim()) { // Check if text input is not empty
+                    nationalityError.classList.add('hidden');
+                } else {
+                    nationalityError.classList.remove('hidden');
+                }
+            });
+
+
+            // Add event listener for email validation on blur
+            document.getElementById('clientEmail').addEventListener('blur', function() {
+                const email = this.value;
+                const emailErrorSpan = document.getElementById('emailError');
+                if (email && !isValidEmail(email)) {
+                    emailErrorSpan.classList.remove('hidden');
+                } else {
+                    emailErrorSpan.classList.add('hidden');
+                }
+            });
+
+            // Listeners for calculator elements
+            document.getElementById('calculateButton').addEventListener('click', calculateRentalPrice);
+            document.getElementById('shareQuoteButton').addEventListener('click', shareQuote);
+        });
+    </script>
+</body>
+</html>
